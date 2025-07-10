@@ -35,6 +35,20 @@ func setupRouter() *gin.Engine {
 	})
 	r.GET("/api/urls", GetAllUrlsHandler)
 
+	r.POST("/api/urls", func(c *gin.Context) {
+	var input models.Url
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	input.Status = "queued"
+	if err := DB.Create(&input).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, input)
+})
+
 	// Authorized group (uses gin.BasicAuth() middleware)
 	// Same than:
 	// authorized := r.Group("/")
