@@ -5,7 +5,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/dalibouali/task-app-backend/models"
 	"github.com/dalibouali/task-app-backend/services"
+	"github.com/dalibouali/task-app-backend/crawler"
 	"github.com/gin-contrib/cors"
+
 
 )
 
@@ -47,6 +49,27 @@ func setupRouter() *gin.Engine {
 		return
 	}
 	c.JSON(http.StatusOK, input)
+})
+
+r.PUT("/api/urls/:id/rerun", func(c *gin.Context) {
+	id := c.Param("id")
+	var url models.Url
+	if err := DB.First(&url, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "URL not found"})
+		return
+	}
+	url.Status = "queued"
+	DB.Save(&url)
+	c.JSON(http.StatusOK, url)
+})
+
+r.DELETE("/api/urls/:id", func(c *gin.Context) {
+	id := c.Param("id")
+	if err := DB.Delete(&models.Url{}, id).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"deleted": id})
 })
 
 	// Authorized group (uses gin.BasicAuth() middleware)
