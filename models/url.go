@@ -1,10 +1,11 @@
 package models
+
 import (
 	"gorm.io/gorm"
 )
 
 type Url struct {
-	gorm.Model
+	ID            uint   `json:"id"`
 	URL           string `json:"url"`
 	HtmlVersion   string `json:"htmlVersion"`
 	Title         string `json:"title"`
@@ -15,5 +16,7 @@ type Url struct {
 	BrokenLinks   int    `json:"brokenLinks"`
 	HasLoginForm  bool   `json:"hasLoginForm"`
 	Status        string `json:"status"`
+	CreatedAt     time.Time `json:"createdAt"`
+	UpdatedAt     time.Time `json:"updatedAt"`
+	DeletedAt     gorm.DeletedAt `json:"deletedAt"`
 }
-
