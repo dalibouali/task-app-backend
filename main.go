@@ -62,6 +62,7 @@ func CreateUrlHandler(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	go crawler.AnalyzeUrl(database.DB, &input)
 	c.JSON(http.StatusOK, input)
 }
 
@@ -107,6 +108,6 @@ func startCrawlerWorker() {
 			fmt.Println("Processing:", u.URL)
 			crawler.AnalyzeUrl(database.DB, &u)
 		}
-		time.Sleep(5 * time.Second)
+		time.Sleep(1 * time.Second)
 	}
 }
