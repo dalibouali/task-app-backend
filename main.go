@@ -38,6 +38,8 @@ func setupRouter() *gin.Engine {
 	api.POST("/urls", CreateUrlHandler)
 	api.PUT("/urls/:id/rerun", RerunUrlHandler)
 	api.DELETE("/urls/:id", DeleteUrlHandler)
+	api.PUT("/urls/:id/stop", StopUrlHandler)
+
 
 	return r
 }
@@ -111,3 +113,16 @@ func startCrawlerWorker() {
 		time.Sleep(1 * time.Second)
 	}
 }
+
+func StopUrlHandler(c *gin.Context) {
+	id := c.Param("id")
+	var url models.Url
+	if err := database.DB.First(&url, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "URL not found"})
+		return
+	}
+	url.Status = "stopped"
+	database.DB.Save(&url)
+	c.JSON(http.StatusOK, url)
+}
+
