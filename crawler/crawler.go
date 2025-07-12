@@ -13,44 +13,57 @@ import (
 
 
 func AnalyzeUrl(db *gorm.DB, urlEntry *models.Url) {
-	fmt.Println("Starting analysis for:", urlEntry.URL)
-	urlEntry.Status = "running"
-	db.Save(urlEntry)
-	fmt.Println("Fetching URL:", urlEntry.URL)	
-	
+	// Always reload the latest from DB
+	var current models.Url
+	if err := db.First(&current, urlEntry.ID).Error; err != nil {
+		fmt.Println("Error fetching latest URL record:", err)
+		return
+	}
 
-	resp, err := http.Get(urlEntry.URL)
+	// Skip if not queued anymore (maybe stopped or processed already)
+	if current.Status != "queued" {
+		fmt.Println("Skipping", current.URL, "status is now", current.Status)
+		return
+	}
+
+	fmt.Println("Starting analysis for:", current.URL)
+	current.Status = "running"
+	db.Save(&current)
+
+	fmt.Println("Fetching URL:", current.URL)
+	resp, err := http.Get(current.URL)
 	if err != nil {
-		urlEntry.Status = "error"
-		db.Save(urlEntry)
+		current.Status = "error"
+		db.Save(&current)
 		return
 	}
 	defer resp.Body.Close()
 
 	doc, err := html.Parse(resp.Body)
 	if err != nil {
-		urlEntry.Status = "error"
-		db.Save(urlEntry)
+		current.Status = "error"
+		db.Save(&current)
 		return
 	}
 
-	parsedBase, err := url.Parse(urlEntry.URL)
+	parsedBase, err := url.Parse(current.URL)
 	if err != nil {
-		urlEntry.Status = "error"
-		db.Save(urlEntry)
+		current.Status = "error"
+		db.Save(&current)
 		return
 	}
 
-	urlEntry.HtmlVersion = detectHTMLVersion(doc)
-	urlEntry.Title = extractTitle(doc)
-	urlEntry.H1Count, urlEntry.H2Count = countHeadings(doc)
-	urlEntry.InternalLinks, urlEntry.ExternalLinks, urlEntry.BrokenLinks = countLinks(parsedBase, doc)
-	urlEntry.HasLoginForm = detectLoginForm(doc)
-	urlEntry.Status = "done"
+	current.HtmlVersion = detectHTMLVersion(doc)
+	current.Title = extractTitle(doc)
+	current.H1Count, current.H2Count = countHeadings(doc)
+	current.InternalLinks, current.ExternalLinks, current.BrokenLinks = countLinks(parsedBase, doc)
+	current.HasLoginForm = detectLoginForm(doc)
+	current.Status = "done"
 
-	db.Save(urlEntry)
-	fmt.Println("Finished analysis for:", urlEntry.URL)
+	db.Save(&current)
+	fmt.Println("Finished analysis for:", current.URL)
 }
+
 
 func detectHTMLVersion(n *html.Node) string {
 	// Look for <!DOCTYPE html>

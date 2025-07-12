@@ -64,9 +64,9 @@ func CreateUrlHandler(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	go crawler.AnalyzeUrl(database.DB, &input)
 	c.JSON(http.StatusOK, input)
 }
+
 
 // On Click o Rerun URL Crawl , this will set the status to "queued" again
 // so that the worker can pick it up again
@@ -117,12 +117,21 @@ func startCrawlerWorker() {
 func StopUrlHandler(c *gin.Context) {
 	id := c.Param("id")
 	var url models.Url
+
 	if err := database.DB.First(&url, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "URL not found"})
 		return
 	}
+
+	if url.Status != "queued" && url.Status != "running" {
+	// Skip changing this one
+	c.JSON(http.StatusOK, url)
+	return
+}
+
 	url.Status = "stopped"
 	database.DB.Save(&url)
 	c.JSON(http.StatusOK, url)
 }
+
 
