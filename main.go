@@ -8,8 +8,8 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/dalibouali/task-app-backend/models"
 	"github.com/dalibouali/task-app-backend/crawler"
-	"github.com/dalibouali/task-app-backend/services"
 	"github.com/dalibouali/task-app-backend/database"
+	"strings"
 )
 
 func setupRouter() *gin.Engine {
@@ -33,7 +33,6 @@ func setupRouter() *gin.Engine {
 		"admin":  "admin",
 	}))
 
-	// API routes
 	api.GET("/urls", GetAllUrlsHandler)
 	api.POST("/urls", CreateUrlHandler)
 	api.PUT("/urls/:id/rerun", RerunUrlHandler)
@@ -46,7 +45,8 @@ func setupRouter() *gin.Engine {
 
 func GetAllUrlsHandler(c *gin.Context) {
 	page := c.DefaultQuery("page", "1")
-	pageSize := c.DefaultQuery("pageSize", "10")
+	pageSize := c.DefaultQuery("pageSize", "5")
+	search := c.DefaultQuery("search", "")
 
 	var pageInt, pageSizeInt int
 	fmt.Sscanf(page, "%d", &pageInt)
@@ -62,8 +62,17 @@ func GetAllUrlsHandler(c *gin.Context) {
 	var total int64
 	var urls []models.Url
 
-	database.DB.Model(&models.Url{}).Count(&total)
-	database.DB.
+	query := database.DB.Model(&models.Url{})
+
+	if strings.TrimSpace(search) != "" {
+		like := "%" + strings.ToLower(search) + "%"
+		query = query.Where("LOWER(title) LIKE ? OR LOWER(url) LIKE ?", like, like)
+	}
+
+	query.Count(&total)
+
+	query.
+		Order("created_at desc").
 		Limit(pageSizeInt).
 		Offset((pageInt - 1) * pageSizeInt).
 		Find(&urls)
@@ -75,6 +84,7 @@ func GetAllUrlsHandler(c *gin.Context) {
 		"pageSize": pageSizeInt,
 	})
 }
+
 // CreateUrlHandler creates a new URL entry in the database
 func CreateUrlHandler(c *gin.Context) {
 	var input models.Url
