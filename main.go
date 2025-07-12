@@ -45,12 +45,35 @@ func setupRouter() *gin.Engine {
 }
 
 func GetAllUrlsHandler(c *gin.Context) {
-	urls, err := services.GetAllUrls(database.DB)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+	page := c.DefaultQuery("page", "1")
+	pageSize := c.DefaultQuery("pageSize", "10")
+
+	var pageInt, pageSizeInt int
+	fmt.Sscanf(page, "%d", &pageInt)
+	fmt.Sscanf(pageSize, "%d", &pageSizeInt)
+
+	if pageInt < 1 {
+		pageInt = 1
 	}
-	c.JSON(http.StatusOK, gin.H{"urls": urls})
+	if pageSizeInt < 1 {
+		pageSizeInt = 10
+	}
+
+	var total int64
+	var urls []models.Url
+
+	database.DB.Model(&models.Url{}).Count(&total)
+	database.DB.
+		Limit(pageSizeInt).
+		Offset((pageInt - 1) * pageSizeInt).
+		Find(&urls)
+
+	c.JSON(http.StatusOK, gin.H{
+		"urls": urls,
+		"total": total,
+		"page": pageInt,
+		"pageSize": pageSizeInt,
+	})
 }
 // CreateUrlHandler creates a new URL entry in the database
 func CreateUrlHandler(c *gin.Context) {
