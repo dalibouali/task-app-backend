@@ -20,7 +20,7 @@ func AnalyzeUrl(db *gorm.DB, urlEntry *models.Url) {
 		return
 	}
 
-	// Skip if not queued anymore (maybe stopped or processed already)
+	// Skip if not queued anymore (stopped or processed already)
 	if current.Status != "queued" {
 		fmt.Println("Skipping", current.URL, "status is now", current.Status)
 		return
@@ -56,26 +56,38 @@ func AnalyzeUrl(db *gorm.DB, urlEntry *models.Url) {
 	current.HtmlVersion = detectHTMLVersion(doc)
 	current.Title = extractTitle(doc)
 	current.H1Count, current.H2Count = countHeadings(doc)
-	current.InternalLinks, current.ExternalLinks, current.BrokenLinks = countLinks(parsedBase, doc)
+	internalLinks, externalLinks, brokenLinks := countLinks(parsedBase, doc)
+	current.InternalLinks = internalLinks
+	current.ExternalLinks = externalLinks
+	current.BrokenLinksCount = len(brokenLinks)
+	current.BrokenLinksList = brokenLinks
 	current.HasLoginForm = detectLoginForm(doc)
 	current.Status = "done"
 
 	db.Save(&current)
+	// Clear existing broken links
+	db.Unscoped().Where("url_id = ?", current.ID).Delete(&models.BrokenLink{})
+
+	// Save new broken links
+	for _, b := range brokenLinks {
+		b.UrlID = current.ID
+		db.Create(&b)
+	}
+
 	fmt.Println("Finished analysis for:", current.URL)
 }
 
 
 func detectHTMLVersion(n *html.Node) string {
-	// Look for <!DOCTYPE html>
-	for c := n; c != nil; c = c.NextSibling {
-		if c.Type == html.DoctypeNode {
-			if strings.EqualFold(c.Data, "html") {
-				return "HTML5"
-			}
-			return "Older HTML"
-		}
-	}
-	return "Unknown"
+    for c := n.FirstChild; c != nil; c = c.NextSibling {
+        if c.Type == html.DoctypeNode {
+            if strings.EqualFold(c.Data, "html") {
+                return "HTML5"
+            }
+            return "Older HTML"
+        }
+    }
+    return "Unknown"
 }
 
 func extractTitle(n *html.Node) string {
@@ -114,11 +126,12 @@ func countHeadings(n *html.Node) (int, int) {
 	return h1, h2
 }
 
-func countLinks(base *url.URL, n *html.Node) (int, int, int) {
-	var internal, external, broken int
-	var f func(*html.Node)
+func countLinks(base *url.URL, n *html.Node) (int, int, []models.BrokenLink) {
+	var internal, external int
+	var brokenLinks []models.BrokenLink
 	client := &http.Client{Timeout: 3 * time.Second}
 
+	var f func(*html.Node)
 	f = func(n *html.Node) {
 		if n.Type == html.ElementNode && n.Data == "a" {
 			for _, attr := range n.Attr {
@@ -140,8 +153,11 @@ func countLinks(base *url.URL, n *html.Node) (int, int, int) {
 					// Check link status code
 					fullUrl := base.ResolveReference(parsedLink).String()
 					statusCode := getStatusCode(client, fullUrl)
-					if statusCode >= 400 {
-						broken++
+					if statusCode >= 400 || statusCode == 0 {
+						brokenLinks = append(brokenLinks, models.BrokenLink{
+							URL: fullUrl,
+							StatusCode: statusCode,
+						})
 					}
 				}
 			}
@@ -151,8 +167,9 @@ func countLinks(base *url.URL, n *html.Node) (int, int, int) {
 		}
 	}
 	f(n)
-	return internal, external, broken
+	return internal, external, brokenLinks
 }
+
 
 func getStatusCode(client *http.Client, link string) int {
 	resp, err := client.Head(link)

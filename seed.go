@@ -21,7 +21,7 @@ func SeedDB() {
 		H2Count:       3,
 		InternalLinks: 10,
 		ExternalLinks: 5,
-		BrokenLinks:   1,
+		BrokenLinksCount:   1,
 		HasLoginForm:  false,
 		Status:        "done",
 	})
@@ -34,7 +34,7 @@ func SeedDB() {
 		H2Count:       4,
 		InternalLinks: 7,
 		ExternalLinks: 8,
-		BrokenLinks:   0,
+		BrokenLinksCount:   0,
 		HasLoginForm:  true,
 		Status:        "done",
 	})

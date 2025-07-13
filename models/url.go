@@ -14,10 +14,11 @@ type Url struct {
 	H2Count       int    `json:"h2Count"`
 	InternalLinks int    `json:"internalLinks"`
 	ExternalLinks int    `json:"externalLinks"`
-	BrokenLinks   int    `json:"brokenLinks"`
+	BrokenLinksCount int `json:"brokenLinksCount"`
 	HasLoginForm  bool   `json:"hasLoginForm"`
 	Status        string `json:"status"`
 	CreatedAt     time.Time `json:"createdAt"`
 	UpdatedAt     time.Time `json:"updatedAt"`
 	DeletedAt     gorm.DeletedAt `json:"deletedAt"`
+	BrokenLinksList []BrokenLink `gorm:"foreignKey:UrlID;references:ID" json:"brokenLinksList"`
 }

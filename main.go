@@ -34,6 +34,7 @@ func setupRouter() *gin.Engine {
 	}))
 
 	api.GET("/urls", GetAllUrlsHandler)
+	api.GET("/urls/:id", GetUrlDetailsHandler)
 	api.POST("/urls", CreateUrlHandler)
 	api.PUT("/urls/:id/rerun", RerunUrlHandler)
 	api.DELETE("/urls/:id", DeleteUrlHandler)
@@ -99,6 +100,16 @@ func CreateUrlHandler(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, input)
 }
+func GetUrlDetailsHandler(c *gin.Context) {
+	id := c.Param("id")
+	var url models.Url
+	if err := database.DB.Preload("BrokenLinksList").First(&url, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "URL not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, url)
+}
 
 
 // On Click o Rerun URL Crawl , this will set the status to "queued" again
@@ -126,7 +137,7 @@ func DeleteUrlHandler(c *gin.Context) {
 
 func main() {
 	database.InitDB()
-	database.DB.AutoMigrate(&models.Url{})
+	database.DB.AutoMigrate(&models.Url{},&models.BrokenLink{})
 
 	// start crawler worker
 	go startCrawlerWorker()
